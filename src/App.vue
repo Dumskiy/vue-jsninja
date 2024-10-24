@@ -203,7 +203,7 @@
 </template>
 
 <script>
-import { loadTikers } from "./api";
+import { subscribeToTicker, unsubscribeFromTicker } from "./api";
 
 export default {
   name: "App",
@@ -244,6 +244,11 @@ export default {
 
     if (tickersData) {
       this.tickers = JSON.parse(tickersData);
+      this.tickers.forEach((ticker) => {
+        subscribeToTicker(ticker.name, (newPrice) =>
+          this.updateTicker(ticker.name, newPrice)
+        );
+      });
     }
 
     setInterval(this.updateTickers, 5000);
@@ -292,24 +297,19 @@ export default {
   },
 
   methods: {
+    updateTicker(tickerName, price) {
+      this.tickers
+        .filter((t) => t.name === tickerName)
+        .forEach((t) => {
+          t.price = price;
+        });
+    },
+
     formatPrice(price) {
       if (price === "-") {
         return price;
       }
       return price > 1 ? price.toFixed(2) : price.toPrecision(2);
-    },
-
-    async updateTickers() {
-      if (!this.tickers.length) {
-        return;
-      }
-
-      const exchangeData = await loadTikers(this.tickers.map((t) => t.name));
-
-      this.tickers.forEach((ticker) => {
-        const price = exchangeData[ticker.name.toUpperCase()];
-        ticker.price = price ?? "-";
-      });
     },
 
     add() {
@@ -319,9 +319,11 @@ export default {
       };
 
       this.tickers = [...this.tickers, currentTicker];
+      this.ticker = "";
       this.filter = "";
-
-      // this.subscribeToUpdates(currentTicker.name);
+      subscribeToTicker(currentTicker.name, (newPrice) =>
+        this.updateTicker(currentTicker.name, newPrice)
+      );
     },
 
     handleDelete(tickerToRemove) {
@@ -329,6 +331,7 @@ export default {
       if (this.selectedTicker === tickerToRemove) {
         this.selectedTicker = null;
       }
+      unsubscribeFromTicker(tickerToRemove.name);
     },
 
     select(ticker) {
